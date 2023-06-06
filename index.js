@@ -26,7 +26,6 @@ app.listen(port, () => {
 // utility
 
 
-
 // routes
 
 app.get('/users', async (req, res) => {
@@ -47,15 +46,8 @@ app.get('/releases', async (req, res) => {
 });
 
 app.get('/votes', async (req, res) => {
-    try {
-        // Retrieve all votes from the database
-        let votes = await Votes.find();
-        res.status(200).json(votes);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Internal server error'
-        });
-    }
+    let votes = await _getVotes();
+    res.status(200).send(votes);
 });
 //POST//
 app.post('/users', async (req, res) => {
@@ -94,8 +86,7 @@ app.post('/votes', async (req, res) => {
         const votesColl = database.collection("Votes");
         const vote = {
             "userId": req.body.userId,
-            "releaseId": req.body.releaseId,
-            "value": req.body.value
+            "releaseId": req.body.releaseId
         };
 
         const insertedVote = await votesColl.insertOne(vote);
@@ -177,15 +168,15 @@ app.delete('/users/:id', async (req, res) => {
     }
 });
 
-app.delete('/votes/:id', async (req, res) => {
+app.delete('/votes/:userId', async (req, res) => {
     try {
         await client.connect();
 
         const votesColl = database.collection("Votes");
-        const voteId = req.params.id;
+        const userId = req.params.userId;
 
         const deletedVote = await votesColl.findOneAndDelete({
-            _id: ObjectId(voteId)
+            userId: userId
         });
 
         if (deletedVote.value === null) {
@@ -280,24 +271,23 @@ app.put('/users/:id', async (req, res) => {
     }
 });
 
-app.put('/votes/:id', async (req, res) => {
+app.put('/votes/:userId', async (req, res) => {
     try {
         await client.connect();
 
         const votesColl = database.collection("Votes");
-        const voteId = req.params.id;
+        const userId = req.params.userId;
+        const releaseId = req.body.releaseId;
 
-        const updatedVote = {
-            $set: {
-                "userId": req.body.userId,
-                "releaseId": req.body.releaseId,
-                "value": req.body.value
-            }
-        };
+        console.log(req.params);
 
         const result = await votesColl.updateOne({
-            _id: ObjectId(voteId)
-        }, updatedVote);
+            userId: userId
+        }, {
+            $set: {
+                "releaseId": releaseId
+            }
+        });
 
         if (result.modifiedCount === 0) {
             res.status(404).json({
@@ -366,6 +356,23 @@ async function _getUsers() {
         let usersColl = database.collection("Users");
         let users = usersColl.find();
         return await users.toArray();
+    } catch (error) {
+        console.log(error)
+        res.status(500).send({
+            error: 'Something went wrong!',
+            value: error
+        });
+    } finally {
+        await client.close();
+    }
+}
+
+async function _getVotes() {
+    try {
+        await client.connect();
+        let votesColl = database.collection("Votes");
+        let votes = votesColl.find();
+        return await votes.toArray();
     } catch (error) {
         console.log(error)
         res.status(500).send({
