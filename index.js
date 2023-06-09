@@ -6,6 +6,7 @@ const {
 const express = require('express')
 const app = express()
 const bodyParser = require('body-parser')
+const cors = require('cors');
 const port = 3000
 const uri = "mongodb+srv://brent:mongodeeznutz@cluster0.4su5r5h.mongodb.net/?retryWrites=true&w=majority";
 const client = new MongoClient(uri);
@@ -16,6 +17,7 @@ app.use(bodyParser.urlencoded({
 }))
 // parse application/json
 app.use(bodyParser.json())
+app.use(cors());
 
 // main
 
@@ -34,15 +36,8 @@ app.get('/users', async (req, res) => {
 })
 //GET//
 app.get('/releases', async (req, res) => {
-    try {
-        // Retrieve all releases from the database
-        let releases = await Releases.find();
-        res.status(200).json(releases);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Internal server error'
-        });
-    }
+    let releases = await _getReleases();
+    res.status(200).send(votes);
 });
 
 app.get('/votes', async (req, res) => {
@@ -54,8 +49,8 @@ app.post('/users', async (req, res) => {
     try {
         await client.connect();
 
-        let usersColl = database.collection("Users");
-        let user = {
+        const usersColl = database.collection("Users");
+        const user = {
             "password": req.body.password,
             "displayname": req.body.displayname,
             "email": req.body.email
@@ -63,21 +58,22 @@ app.post('/users', async (req, res) => {
 
         const insertedUser = await usersColl.insertOne(user);
 
-        res.status(201).send({
+        res.status(201).json({
             status: "Saved",
             message: "User has been saved!",
             data: insertedUser
-        })
+        });
     } catch (error) {
-        console.log(error)
-        res.status(500).send({
+        console.log(error);
+        res.status(500).json({
             error: 'Something went wrong!',
             value: error
         });
     } finally {
         await client.close();
     }
-})
+});
+
 
 app.post('/votes', async (req, res) => {
     try {
@@ -120,14 +116,14 @@ app.post('/releases', async (req, res) => {
 
         const insertedRelease = await releasesColl.insertOne(release);
 
-        res.status(201).send({
+        res.status(201).json({
             status: "Saved",
             message: "Release has been saved!",
             data: insertedRelease
         });
     } catch (error) {
         console.log(error);
-        res.status(500).send({
+        res.status(500).json({
             error: 'Something went wrong!',
             value: error
         });
@@ -135,16 +131,17 @@ app.post('/releases', async (req, res) => {
         await client.close();
     }
 });
+
 //DELETE//
-app.delete('/users/:id', async (req, res) => {
+app.delete('/users/:userId', async (req, res) => {
     try {
         await client.connect();
 
         const usersColl = database.collection("Users");
-        const userId = req.params.id;
+        const userId = req.params.userId;
 
         const deletedUser = await usersColl.findOneAndDelete({
-            _id: ObjectId(userId)
+            userId: userId
         });
 
         if (deletedUser.value === null) {
@@ -167,6 +164,7 @@ app.delete('/users/:id', async (req, res) => {
         await client.close();
     }
 });
+
 
 app.delete('/votes/:userId', async (req, res) => {
     try {
@@ -200,15 +198,15 @@ app.delete('/votes/:userId', async (req, res) => {
     }
 });
 
-app.delete('/releases/:id', async (req, res) => {
+app.delete('/releases/:releaseId', async (req, res) => {
     try {
         await client.connect();
 
         const releasesColl = database.collection("Releases");
-        const releaseId = req.params.id;
+        const releaseId = req.params.releaseId;
 
         const deletedRelease = await releasesColl.findOneAndDelete({
-            _id: ObjectId(releaseId)
+            releaseId: releaseId
         });
 
         if (deletedRelease.value === null) {
@@ -231,25 +229,29 @@ app.delete('/releases/:id', async (req, res) => {
         await client.close();
     }
 });
+
 //PUT//
-app.put('/users/:id', async (req, res) => {
+app.put('/users/:userId', async (req, res) => {
     try {
         await client.connect();
 
         const usersColl = database.collection("Users");
-        const userId = req.params.id;
-
-        const updatedUser = {
-            $set: {
-                "password": req.body.password,
-                "displayname": req.body.displayname,
-                "email": req.body.email
-            }
-        };
+        const userId = req.params.userId;
+        const {
+            password,
+            displayname,
+            email
+        } = req.body;
 
         const result = await usersColl.updateOne({
-            _id: ObjectId(userId)
-        }, updatedUser);
+            userId: userId
+        }, {
+            $set: {
+                password,
+                displayname,
+                email
+            }
+        });
 
         if (result.modifiedCount === 0) {
             res.status(404).json({
@@ -270,6 +272,7 @@ app.put('/users/:id', async (req, res) => {
         await client.close();
     }
 });
+
 
 app.put('/votes/:userId', async (req, res) => {
     try {
@@ -309,24 +312,27 @@ app.put('/votes/:userId', async (req, res) => {
     }
 });
 
-app.put('/releases/:id', async (req, res) => {
+app.put('/releases/:releaseId', async (req, res) => {
     try {
         await client.connect();
 
         const releasesColl = database.collection("Releases");
-        const releaseId = req.params.id;
-
-        const updatedRelease = {
-            $set: {
-                "name": req.body.name,
-                "description": req.body.description,
-                "date": req.body.date
-            }
-        };
+        const releaseId = req.params.releaseId;
+        const {
+            name,
+            description,
+            date
+        } = req.body;
 
         const result = await releasesColl.updateOne({
-            _id: ObjectId(releaseId)
-        }, updatedRelease);
+            releaseId: releaseId
+        }, {
+            $set: {
+                name,
+                description,
+                date
+            }
+        });
 
         if (result.modifiedCount === 0) {
             res.status(404).json({
@@ -347,6 +353,7 @@ app.put('/releases/:id', async (req, res) => {
         await client.close();
     }
 });
+
 
 // getters
 
@@ -383,4 +390,24 @@ async function _getVotes() {
         await client.close();
     }
 }
+
+async function _getReleases() {
+    try {
+        await client.connect();
+        let releasesColl = database.collection("Releases");
+        let releases = releasesColl.find()
+        return await releases.toArray();;
+    } catch (error) {
+        console.log(error)
+        res.status(500).send({
+            error: 'Something went wrong!',
+            value: error
+        });
+    } finally {
+        await client.close();
+    }
+}
+
+
+
 //TEST//
