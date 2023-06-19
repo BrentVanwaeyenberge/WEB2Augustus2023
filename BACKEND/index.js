@@ -37,7 +37,7 @@ app.get('/users', async (req, res) => {
 //GET//
 app.get('/releases', async (req, res) => {
     let releases = await _getReleases();
-    res.status(200).send(votes);
+    res.status(200).send(releases);
 });
 
 app.get('/votes', async (req, res) => {
